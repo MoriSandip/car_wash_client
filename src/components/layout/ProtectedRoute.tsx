@@ -18,15 +18,14 @@ const ProtectedRoute = ({ children, role }: TProtectedRoute): JSX.Element => {
   if (token) {
     try {
       user = verifyToken(token);
-    } catch (error) {
-      console.error("Invalid token:", error);
+    } catch {
       dispatch(logout());
-      return <Navigate to="/login" replace />;
+      return <Navigate to="/" replace />;
     }
   }
   if (!token || (role && user?.role !== role)) {
     dispatch(logout());
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

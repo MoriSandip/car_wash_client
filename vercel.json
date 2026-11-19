@@ -1,3 +1,46 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://car-wash-booking-system-server.vercel.app/api/:path*"
+    },
+    { "source": "/login", "destination": "/" },
+    { "source": "/customer/login", "destination": "/" },
+    { "source": "/customer/register", "destination": "/" },
+    { "source": "/forgot-password", "destination": "/" },
+    { "source": "/dashboard", "destination": "/" },
+    { "source": "/dashboard/booking", "destination": "/" },
+    { "source": "/dashboard/bookingsNew", "destination": "/" },
+    { "source": "/dashboard/allUser", "destination": "/" },
+    { "source": "/dashboard/addService", "destination": "/" },
+    { "source": "/dashboard/allService", "destination": "/" },
+    { "source": "/dashboard/editService/:id", "destination": "/" },
+    { "source": "/dashboard/society", "destination": "/" },
+    { "source": "/dashboard/flat", "destination": "/" },
+    { "source": "/dashboard/car", "destination": "/" },
+    { "source": "/dashboard/plan", "destination": "/" },
+    { "source": "/dashboard/offers", "destination": "/" },
+    { "source": "/dashboard/memberships", "destination": "/" },
+    { "source": "/dashboard/wash-services", "destination": "/" },
+    { "source": "/dashboard/slots", "destination": "/" },
+    { "source": "/dashboard/workers", "destination": "/" },
+    { "source": "/dashboard/attendance", "destination": "/" },
+    { "source": "/dashboard/payments", "destination": "/" },
+    { "source": "/dashboard/customers", "destination": "/" },
+    { "source": "/dashboard/booking-assignment", "destination": "/" },
+    { "source": "/worker", "destination": "/" },
+    { "source": "/bookings", "destination": "/" },
+    { "source": "/profile", "destination": "/" },
+    { "source": "/worker/attendance", "destination": "/" },
+    { "source": "/worker/attendance/report", "destination": "/" },
+    { "source": "/customer", "destination": "/" },
+    { "source": "/customer/profile", "destination": "/" },
+    { "source": "/customer/society", "destination": "/" },
+    { "source": "/customer/flat", "destination": "/" },
+    { "source": "/customer/car", "destination": "/" },
+    { "source": "/customer/book-service", "destination": "/" },
+    { "source": "/customer/bookings", "destination": "/" },
+    { "source": "/customer/status", "destination": "/" },
+    { "source": "/customer/memberships", "destination": "/" }
+  ]
 }

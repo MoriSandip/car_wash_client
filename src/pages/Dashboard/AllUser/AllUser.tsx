@@ -1,4 +1,5 @@
-import { File, ListFilter, MoreHorizontal, PlusCircle } from "lucide-react";
+import { useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -13,11 +14,8 @@ import {
 } from "@/components/ui/card";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -28,17 +26,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   useGetAllUserQuery,
   useUpdateUserMutation,
 } from "@/redux/features/user/user";
 import { User } from "@/types/ServiceType";
+import ListImage from "@/components/ListImage";
+import ListPagination from "@/components/ListPagination";
 
 const AllUser = () => {
+  const [page, setPage] = useState(1);
   const { data } = useGetAllUserQuery(undefined);
   const [UpdateUser] = useUpdateUserMutation();
-  const AllUserFromDb = data?.data;
+  const AllUserFromDb = Array.isArray(data?.data) ? data.data : [];
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(AllUserFromDb.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const visibleUsers = AllUserFromDb.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const handleAdmin = (id: string) => {
     const data = {
@@ -59,7 +67,7 @@ const AllUser = () => {
   const handleBlock = (id: string) => {
     const data = {
       id,
-      updateData: { userStatus: "block" },
+      updateData: { userStatus: "blocked" },
     };
     UpdateUser(data);
   };
@@ -71,61 +79,17 @@ const AllUser = () => {
     UpdateUser(data);
   };
   return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+    <div className="space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col  ">
+        <main className="grid flex-1 items-start">
           <Tabs defaultValue="all">
-            <div className="flex items-center">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="archived" className="hidden sm:flex">
-                  Archived
-                </TabsTrigger>
-              </TabsList>
-              <div className="ml-auto flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 gap-1">
-                      <ListFilter className="h-3.5 w-3.5" />
-                      <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                        Filter
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem checked>
-                      Active
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>Draft</DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>
-                      Archived
-                    </DropdownMenuCheckboxItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button size="sm" variant="outline" className="h-8 gap-1">
-                  <File className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Export
-                  </span>
-                </Button>
-                <Button size="sm" className="h-8 gap-1">
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Add Product
-                  </span>
-                </Button>
-              </div>
-            </div>
+          
             <TabsContent value="all">
-              <Card x-chunk="dashboard-06-chunk-0">
+              <Card >
                 <CardHeader>
-                  <CardTitle>AllUser</CardTitle>
+                  <CardTitle>Admin management</CardTitle>
                   <CardDescription>
-                    Manage your AllUser and view their Status performance.
+                    Manage your admin users and view their status performance.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -149,26 +113,22 @@ const AllUser = () => {
                         </TableHead>
                       </TableRow>
                     </TableHeader>
-                    {AllUserFromDb?.map((user: User) => (
-                      <TableBody key={user._id}>
-                        <TableRow>
+                    <TableBody>
+                      {visibleUsers.map((user: User) => (
+                        <TableRow key={user._id}>
                           <TableCell className="hidden sm:table-cell">
-                            <img
-                              alt="Product image"
-                              className="aspect-square rounded-md object-cover"
-                              height="64"
-                              src={
-                                user?.imageUrl ||
-                                "https://dummyimage.com/600x400/cccccc/000000&text=No+Image+Available"
-                              }
-                              width="64"
+                            <ListImage
+                              source={user?.imageUrl}
+                              alt={`${user?.email || "User"} profile`}
+                              className="h-12 w-12"
                             />
                           </TableCell>
                           <TableCell className="font-medium">
                             {user?.email}
                           </TableCell>
                           <TableCell>
-                            {user.userStatus === "block" ? (
+                            {user.userStatus === "blocked" ||
+                            user.userStatus === "block" ? (
                               <Badge className="bg-red-500">Block</Badge>
                             ) : (
                               <Badge variant="outline">Active</Badge>
@@ -222,15 +182,26 @@ const AllUser = () => {
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                      </TableBody>
-                    ))}
+                      ))}
+                      {!visibleUsers.length && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                            No users found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
                   </Table>
                 </CardContent>
                 <CardFooter>
-                  <div className="text-xs text-muted-foreground">
-                    Showing <strong>1-10</strong> of <strong>32</strong>{" "}
-                    products
-                  </div>
+                  <ListPagination
+                    page={currentPage}
+                    totalPages={totalPages}
+                    totalItems={AllUserFromDb.length}
+                    pageSize={pageSize}
+                    itemLabel="users"
+                    onPageChange={setPage}
+                  />
                 </CardFooter>
               </Card>
             </TabsContent>

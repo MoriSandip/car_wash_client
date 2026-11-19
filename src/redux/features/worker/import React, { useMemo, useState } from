@@ -1,0 +1,1442 @@
+import React, { useMemo, useState } from "react";
+import {
+  useCreateFlatMutation,
+  useDeleteFlatMutation,
+  useGetFlatsQuery,
+  useUpdateFlatMutation,
+  type TFlat,
+  type TFlatPayload,
+} from "@/redux/features/flat/flatApi";
+
+import FlatForm from "./FlatForm";
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Download,
+  Eye,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+
+type TMode = "add" | "edit" | "view";
+
+const getFlats = (response: any): TFlat[] => {
+  const value = response?.data;
+
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.result)) return value.result;
+
+  return [];
+};
+
+const getSocietyId = (flat: TFlat): string =>
+  typeof flat.societyId === "string"
+    ? flat.societyId
+    : flat.societyId?._id || "";
+
+const getSocietyName = (flat: TFlat): string =>
+  typeof flat.societyId === "object"
+    ? flat.societyId?.name || "—"
+    : "—";
+
+const getErrorMessage = (error: any): string =>
+  error?.data?.message || error?.message || "Something went wrong.";
+http://192.168.1.35:5173/
+const Flat: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [societyFilter, setSocietyFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [mode, setMode] = useState<TMode>("add");
+  const [selectedFlat, setSelectedFlat] = useState<TFlat | null>(null);
+  const [actionError, setActionError] = useState("");
+
+  const {
+    data: flatResponse,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetFlatsQuery();
+
+  const [createFlat, { isLoading: isCreating }] = useCreateFlatMutation();
+  const [updateFlat, { isLoading: isUpdating }] = useUpdateFlatMutation();
+  const [deleteFlat, { isLoading: isDeleting }] = useDeleteFlatMutation();
+
+  const flats = useMemo(() => getFlats(flatResponse), [flatResponse]);
+
+  const filteredFlats = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+
+    return flats.filter((flat) => {
+      const matchesSearch =
+        !search ||
+        (flat.flatNumber || "").toLowerCase().includes(search) ||
+        (flat.block || "").toLowerCase().includes(search) ||
+        (flat.flatType || "").toLowerCase().includes(search) ||
+        getSocietyName(flat).toLowerCase().includes(search);
+
+      const matchesSociety =
+        societyFilter === "all" || getSocietyId(flat) === societyFilter;
+
+      const matchesStatus =
+        statusFilter === "all" || flat.status === statusFilter;
+
+      return matchesSearch && matchesSociety && matchesStatus;
+    });
+  }, [flats, searchTerm, societyFilter, statusFilter]);
+
+  const openAddForm = () => {
+    setSelectedFlat(null);
+    setMode("add");
+    setActionError("");
+    setFormOpen(true);
+  };
+
+  const openEditForm = (flat: TFlat) => {
+    setSelectedFlat(flat);
+    setMode("edit");
+    setActionError("");
+    setFormOpen(true);
+  };
+
+  const openViewForm = (flat: TFlat) => {
+    setSelectedFlat(flat);
+    setMode("view");
+    setActionError("");
+    setFormOpen(true);
+  };
+
+  const handleFormSubmit = async (payload: TFlatPayload) => {
+    if (mode === "edit" && selectedFlat) {
+      await updateFlat({
+        id: selectedFlat._id,
+        data: payload,
+      }).unwrap();
+    } else {
+      await createFlat(payload).unwrap();
+    }
+
+    setFormOpen(false);
+    setSelectedFlat(null);
+    setActionError("");
+  };
+
+  const handleDelete = async () => {
+    if (!selectedFlat) return;
+
+    setActionError("");
+
+    try {
+      await deleteFlat(selectedFlat._id).unwrap();
+      setDeleteOpen(false);
+      setSelectedFlat(null);
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  };
+
+  const exportCSV = () => {
+    const headers = [
+      "Society",
+      "Flat Number",
+      "Block / Wing",
+      "Floor",
+      "Flat Type",
+      "Area (sq. ft.)",
+      "Status",
+      "Description",
+    ];
+
+    const rows = filteredFlats.map((flat) => [
+      getSocietyName(flat),
+      flat.flatNumber,
+      flat.block || "",
+      flat.floorNumber ?? "",
+      flat.flatType,
+      flat.area ?? "",
+      flat.status,
+      flat.description || "",
+    ]);
+
+    const escapeCSV = (value: unknown) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCSV).join(","))
+      .join("\r\n");
+
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "flats.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const statusClass = (status: string) => {
+    switch (status) {
+      case "Available":
+        return "bg-green-100 text-green-700";
+      case "Occupied":
+        return "bg-blue-100 text-blue-700";
+      case "Maintenance":
+        return "bg-orange-100 text-orange-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  return (
+    <div className="space-y-6 px-12 py-4">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Flat Management
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage flats registered under your Societies.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+
+          <Button onClick={openAddForm}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Flat
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Flats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{flats.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Available</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-green-600">
+              {flats.filter((flat) => flat.status === "Available").length}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Occupied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">
+              {flats.filter((flat) => flat.status === "Occupied").length}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-orange-600">
+              {flats.filter((flat) => flat.status === "Maintenance").length}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All Flats</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search Flat or Society..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+
+            <Select value={societyFilter} onValueChange={setSocietyFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by Society" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Societies</SelectItem>
+                {Array.from(
+                  new Map(
+                    flats
+                      .filter(
+                        (flat) =>
+                          typeof flat.societyId === "object" &&
+                          flat.societyId?._id
+                      )
+                      .map((flat) => [
+                        (flat.societyId as { _id: string })._id,
+                        flat.societyId as {
+                          _id: string;
+                          name: string;
+                        },
+                      ])
+                  ).values()
+                ).map((society) => (
+                  <SelectItem key={society._id} value={society._id}>
+                    {society.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="Available">Available</SelectItem>
+                <SelectItem value="Occupied">Occupied</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isLoading ? (
+            <div className="py-10 text-center text-muted-foreground">
+              Loading Flats...
+            </div>
+          ) : isError ? (
+            <div className="space-y-3 py-10 text-center">
+              <p className="text-sm text-red-600">
+                Failed to load Flats. Please try again.
+              </p>
+              <Button variant="outline" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Society</TableHead>
+                    <TableHead>Flat Number</TableHead>
+                    <TableHead>Block / Wing</TableHead>
+                    <TableHead>Floor</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Area (sq. ft.)</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {filteredFlats.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={8}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        No Flats found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredFlats.map((flat) => (
+                      <TableRow key={flat._id}>
+                        <TableCell className="font-medium">
+                          {getSocietyName(flat)}
+                        </TableCell>
+                        <TableCell>{flat.flatNumber}</TableCell>
+                        <TableCell>{flat.block || "—"}</TableCell>
+                        <TableCell>{flat.floorNumber ?? "—"}</TableCell>
+                        <TableCell>{flat.flatType}</TableCell>
+                        <TableCell>{flat.area ?? "—"}</TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(
+                              flat.status
+                            )}`}
+                          >
+                            {flat.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="View Flat"
+                              onClick={() => openViewForm(flat)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Edit Flat"
+                              onClick={() => openEditForm(flat)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Delete Flat"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => {
+                                setSelectedFlat(flat);
+                                setActionError("");
+                                setDeleteOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {isFetching && !isLoading && (
+            <p className="text-xs text-muted-foreground">Refreshing data...</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add / Edit / View Flat */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setSelectedFlat(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {mode === "add"
+                ? "Add Flat"
+                : mode === "edit"
+                ? "Edit Flat"
+                : "View Flat"}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === "view"
+                ? "Flat information and details."
+                : "Enter the Flat information below."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <FlatForm
+            key={`${mode}-${selectedFlat?._id || "new"}`}
+            initialData={selectedFlat}
+            mode={mode}
+            loading={isCreating || isUpdating}
+            onSubmit={handleFormSubmit}
+            onClose={() => {
+              setFormOpen(false);
+              setSelectedFlat(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open);
+          if (!open) setActionError("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Flat</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete Flat{" "}
+              <strong>{selectedFlat?.flatNumber}</strong>? This action will
+              soft-delete the record.
+            </DialogDescription>
+          </DialogHeader>
+
+          {actionError && (
+            <p role="alert" className="text-sm text-red-600">
+              {actionError}
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default Flat;
+
+import React, { useEffect, useState } from "react";
+import type {
+  TFlat,
+  TFlatPayload,
+  TFlatStatus,
+} from "@/redux/features/flat/flatApi";
+import { useGetSocietiesQuery } from "@/redux/features/society/societyApi";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type TSocietyOption = {
+  _id: string;
+  name: string;
+  city?: string;
+};
+
+type TFlatFormProps = {
+  initialData?: TFlat | null;
+  mode: "add" | "edit" | "view";
+  loading?: boolean;
+  onSubmit: (data: TFlatPayload) => Promise<void> | void;
+  onClose: () => void;
+};
+
+const defaultForm: TFlatPayload = {
+  societyId: "",
+  flatNumber: "",
+  block: "",
+  floorNumber: undefined,
+  flatType: "2 BHK",
+  area: undefined,
+  status: "Available",
+  description: "",
+};
+
+const getSocieties = (response: any): TSocietyOption[] => {
+  const value = response?.data;
+
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.result)) return value.result;
+
+  return [];
+};
+
+const getSocietyId = (flat?: TFlat | null): string => {
+  if (!flat) return "";
+
+  return typeof flat.societyId === "string"
+    ? flat.societyId
+    : flat.societyId?._id || "";
+};
+
+const FlatForm: React.FC<TFlatFormProps> = ({
+  initialData,
+  mode,
+  loading = false,
+  onSubmit,
+  onClose,
+}) => {
+  const [form, setForm] = useState<TFlatPayload>(defaultForm);
+  const [error, setError] = useState("");
+
+  const { data: societyResponse, isLoading: societiesLoading } =
+    useGetSocietiesQuery();
+
+  const societies = getSocieties(societyResponse);
+  const isView = mode === "view";
+
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        societyId: getSocietyId(initialData),
+        flatNumber: initialData.flatNumber || "",
+        block: initialData.block || "",
+        floorNumber: initialData.floorNumber,
+        flatType: initialData.flatType || "2 BHK",
+        area: initialData.area,
+        status: initialData.status || "Available",
+        description: initialData.description || "",
+      });
+    } else {
+      setForm(defaultForm);
+    }
+
+    setError("");
+  }, [initialData, mode]);
+
+  const updateField = <K extends keyof TFlatPayload>(
+    key: K,
+    value: TFlatPayload[K]
+  ) => {
+    setForm((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+
+    if (!form.societyId) {
+      setError("Please select a Society.");
+      return;
+    }
+
+    if (!form.flatNumber.trim()) {
+      setError("Flat Number is required.");
+      return;
+    }
+
+    if (!form.flatType.trim()) {
+      setError("Flat Type is required.");
+      return;
+    }
+
+    const payload: TFlatPayload = {
+      societyId: form.societyId,
+      flatNumber: form.flatNumber.trim().toUpperCase(),
+      block: form.block?.trim() || "",
+      floorNumber:
+        form.floorNumber === undefined || Number.isNaN(form.floorNumber)
+          ? undefined
+          : Number(form.floorNumber),
+      flatType: form.flatType,
+      area:
+        form.area === undefined || Number.isNaN(form.area)
+          ? undefined
+          : Number(form.area),
+      status: form.status,
+      description: form.description?.trim() || "",
+    };
+
+    try {
+      await onSubmit(payload);
+    } catch (err: any) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          "Unable to save Flat. Please try again."
+      );
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="societyId">Society *</Label>
+          <Select
+            value={form.societyId}
+            onValueChange={(value) => updateField("societyId", value)}
+            disabled={isView || societiesLoading}
+          >
+            <SelectTrigger id="societyId">
+              <SelectValue
+                placeholder={
+                  societiesLoading ? "Loading Societies..." : "Select Society"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {societies.map((society) => (
+                <SelectItem key={society._id} value={society._id}>
+                  {society.name}
+                  {society.city ? ` — ${society.city}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="flatNumber">Flat Number *</Label>
+          <Input
+            id="flatNumber"
+            value={form.flatNumber}
+            onChange={(event) =>
+              updateField("flatNumber", event.target.value.toUpperCase())
+            }
+            placeholder="e.g. A-101"
+            maxLength={30}
+            required
+            disabled={isView}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="block">Block / Wing</Label>
+          <Input
+            id="block"
+            value={form.block || ""}
+            onChange={(event) => updateField("block", event.target.value)}
+            placeholder="e.g. A Wing"
+            disabled={isView}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="floorNumber">Floor Number</Label>
+          <Input
+            id="floorNumber"
+            type="number"
+            min={0}
+            value={form.floorNumber ?? ""}
+            onChange={(event) =>
+              updateField(
+                "floorNumber",
+                event.target.value === "" ? undefined : Number(event.target.value)
+              )
+            }
+            placeholder="e.g. 1"
+            disabled={isView}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="flatType">Flat Type *</Label>
+          <Select
+            value={form.flatType}
+            onValueChange={(value) => updateField("flatType", value)}
+            disabled={isView}
+          >
+            <SelectTrigger id="flatType">
+              <SelectValue placeholder="Select Flat Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1 BHK">1 BHK</SelectItem>
+              <SelectItem value="2 BHK">2 BHK</SelectItem>
+              <SelectItem value="3 BHK">3 BHK</SelectItem>
+              <SelectItem value="4 BHK">4 BHK</SelectItem>
+              <SelectItem value="5 BHK">5 BHK</SelectItem>
+              <SelectItem value="Studio">Studio</SelectItem>
+              <SelectItem value="Shop">Shop</SelectItem>
+              <SelectItem value="Office">Office</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="area">Area (sq. ft.)</Label>
+          <Input
+            id="area"
+            type="number"
+            min={0}
+            value={form.area ?? ""}
+            onChange={(event) =>
+              updateField(
+                "area",
+                event.target.value === "" ? undefined : Number(event.target.value)
+              )
+            }
+            placeholder="e.g. 1200"
+            disabled={isView}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="status">Status *</Label>
+          <Select
+            value={form.status}
+            onValueChange={(value) =>
+              updateField("status", value as TFlatStatus)
+            }
+            disabled={isView}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Select Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Available">Available</SelectItem>
+              <SelectItem value="Occupied">Occupied</SelectItem>
+              <SelectItem value="Maintenance">Maintenance</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={form.description || ""}
+            onChange={(event) =>
+              updateField("description", event.target.value)
+            }
+            placeholder="Enter optional details..."
+            rows={3}
+            disabled={isView}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p role="alert" className="text-sm font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2 border-t pt-4">
+        <Button type="button" variant="outline" onClick={onClose}>
+          {isView ? "Close" : "Cancel"}
+        </Button>
+
+        {!isView && (
+          <Button type="submit" disabled={loading}>
+            {loading
+              ? "Saving..."
+              : mode === "edit"
+              ? "Update Flat"
+              : "Create Flat"}
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+};
+
+export default FlatForm;
+
+import { baseApi } from "../../api/baseApi";
+
+export type TFlatStatus = "Available" | "Occupied" | "Maintenance";
+
+export type TFlat = {
+  _id: string;
+  societyId:
+    | string
+    | {
+        _id: string;
+        name: string;
+        city?: string;
+        address?: string;
+      };
+  flatNumber: string;
+  block?: string;
+  floorNumber?: number;
+  flatType: string;
+  area?: number;
+  status: TFlatStatus;
+  description?: string;
+  isDeleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TFlatPayload = {
+  societyId: string;
+  flatNumber: string;
+  block?: string;
+  floorNumber?: number;
+  flatType: string;
+  area?: number;
+  status: TFlatStatus;
+  description?: string;
+};
+
+export type TFlatListResponse = {
+  success: boolean;
+  message: string;
+  data:
+    | TFlat[]
+    | {
+        result: TFlat[];
+        total?: number;
+      };
+};
+
+export type TSingleFlatResponse = {
+  success: boolean;
+  message: string;
+  data: TFlat;
+};
+
+export type TFlatMutationResponse = {
+  success: boolean;
+  message: string;
+  data: TFlat;
+};
+
+const FlatApi = baseApi.injectEndpoints({
+  endpoints: (builder) => ({
+    // Get all Flats
+    getFlats: builder.query<
+      TFlatListResponse,
+      {
+        search?: string;
+        societyId?: string;
+        status?: TFlatStatus;
+        block?: string;
+      } | void
+    >({
+      query: (params) => ({
+        url: "/flats",
+        method: "GET",
+        params: params || undefined,
+      }),
+      providesTags: ["flat"],
+    }),
+
+    // Get single Flat
+    getSingleFlat: builder.query<TSingleFlatResponse, string>({
+      query: (id) => ({
+        url: `/flats/${id}`,
+        method: "GET",
+      }),
+      providesTags: ["flat"],
+    }),
+
+    // Create Flat
+    createFlat: builder.mutation<TFlatMutationResponse, TFlatPayload>({
+      query: (payload) => ({
+        url: "/flats",
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: ["flat"],
+    }),
+
+    // Update Flat
+    updateFlat: builder.mutation<
+      TFlatMutationResponse,
+      { id: string; data: Partial<TFlatPayload> }
+    >({
+      query: ({ id, data }) => ({
+        url: `/flats/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["flat"],
+    }),
+
+    // Delete Flat (soft delete on backend)
+    deleteFlat: builder.mutation<
+      TFlatMutationResponse,
+      string
+    >({
+      query: (id) => ({
+        url: `/flats/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["flat"],
+    }),
+  }),
+});
+
+export const {
+  useGetFlatsQuery,
+  useGetSingleFlatQuery,
+  useCreateFlatMutation,
+  useUpdateFlatMutation,
+  useDeleteFlatMutation,
+} = FlatApi;
+
+import { Request, Response } from "express";
+import { MongoServerError } from "mongodb";
+import { FlatServices } from "./flat.service";
+
+const sendError = (res: Response, error: unknown) => {
+  const err = error as Error & { code?: number };
+
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message: "This Flat Number already exists in the selected Society.",
+    });
+  }
+
+  const message = err.message || "Something went wrong";
+
+  const statusCode =
+    /not found/i.test(message)
+      ? 404
+      : /invalid|required|cannot be negative/i.test(message)
+      ? 400
+      : 500;
+
+  return res.status(statusCode).json({
+    success: false,
+    message,
+  });
+};
+
+const createFlat = async (req: Request, res: Response) => {
+  try {
+    const result = await FlatServices.createFlat(req.body);
+
+    return res.status(201).json({
+      success: true,
+      message: "Flat created successfully",
+      data: result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const getAllFlats = async (req: Request, res: Response) => {
+  try {
+    const result = await FlatServices.getAllFlats(req.query);
+
+    return res.status(200).json({
+      success: true,
+      message: "Flats fetched successfully",
+      data: {
+        result,
+        total: result.length,
+      },
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const getSingleFlat = async (req: Request, res: Response) => {
+  try {
+    const result = await FlatServices.getSingleFlat(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Flat fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const updateFlat = async (req: Request, res: Response) => {
+  try {
+    const result = await FlatServices.updateFlat(req.params.id, req.body);
+
+    return res.status(200).json({
+      success: true,
+      message: "Flat updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const deleteFlat = async (req: Request, res: Response) => {
+  try {
+    const result = await FlatServices.deleteFlat(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Flat deleted successfully",
+      data: result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+export const FlatControllers = {
+  createFlat,
+  getAllFlats,
+  getSingleFlat,
+  updateFlat,
+  deleteFlat,
+};
+
+import { Types } from "mongoose";
+
+export type TFlatStatus = "Available" | "Occupied" | "Maintenance";
+
+export type TFlat = {
+  societyId: Types.ObjectId;
+  flatNumber: string;
+  block?: string;
+  floorNumber?: number;
+  flatType: string;
+  area?: number;
+  status: TFlatStatus;
+  description?: string;
+  isDeleted: boolean;
+};
+
+import { Schema, model } from "mongoose";
+import { TFlat } from "./flat.interface";
+
+const flatSchema = new Schema<TFlat>(
+  {
+    societyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Society",
+      required: [true, "Society is required"],
+      index: true,
+    },
+    flatNumber: {
+      type: String,
+      required: [true, "Flat number is required"],
+      trim: true,
+      uppercase: true,
+    },
+    block: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    floorNumber: {
+      type: Number,
+      min: [0, "Floor number cannot be negative"],
+    },
+    flatType: {
+      type: String,
+      required: [true, "Flat type is required"],
+      trim: true,
+    },
+    area: {
+      type: Number,
+      min: [0, "Area cannot be negative"],
+    },
+    status: {
+      type: String,
+      enum: ["Available", "Occupied", "Maintenance"],
+      default: "Available",
+      required: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  }
+);
+
+// Duplicate Flat Numbers are prevented within the same active Society.
+flatSchema.index(
+  { societyId: 1, flatNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isDeleted: false },
+    name: "unique_active_flat_per_society",
+  }
+);
+
+const Flat = model<TFlat>("Flat", flatSchema);
+
+export default Flat;
+import express from 'express';
+import validateRequest from '../../app/middlewares/validateRequest';
+ import { FlatControllers } from './flat.controller';
+import auth from '../../app/middlewares/auth';
+import { USER_ROLE } from '../Auth/auth.constant';
+import { createFlatValidationSchema, updateFlatValidationSchema } from './flat.validation';
+
+const route = express.Router();
+
+route.post(
+  '/',
+  auth(USER_ROLE.admin),
+  validateRequest(createFlatValidationSchema),
+  FlatControllers.createFlat,
+);
+
+route.get('/', FlatControllers.getAllFlats);
+
+route.get('/:id', FlatControllers.getSingleFlat);
+
+route.delete(
+  '/:id',
+  auth(USER_ROLE.admin),
+  FlatControllers.deleteFlat,
+);
+
+route.put(
+  '/:id',
+  auth(USER_ROLE.admin),
+  validateRequest(updateFlatValidationSchema),
+  FlatControllers.updateFlat,
+);
+
+export const flatRoute = route;
+
+import { Types } from "mongoose";
+import Flat from "./flat.model";
+import { Society } from "../Society/society.model";
+
+type TFlatPayload = {
+  societyId?: string;
+  flatNumber?: string;
+  block?: string;
+  floorNumber?: number;
+  flatType?: string;
+  area?: number;
+  status?: "Available" | "Occupied" | "Maintenance";
+  description?: string;
+};
+
+const ensureActiveSociety = async (societyId: string) => {
+  if (!Types.ObjectId.isValid(societyId)) {
+    throw new Error("Invalid Society ID");
+  }
+
+  const society = await Society.findOne({
+    _id: societyId,
+    isDeleted: { $ne: true },
+  });
+
+  if (!society) {
+    throw new Error("Society not found or deleted");
+  }
+};
+
+const normalizePayload = (payload: TFlatPayload) => {
+  const normalized = { ...payload };
+
+  if (normalized.flatNumber) {
+    normalized.flatNumber = normalized.flatNumber.trim().toUpperCase();
+  }
+
+  if (normalized.block !== undefined) {
+    normalized.block = normalized.block.trim();
+  }
+
+  return normalized;
+};
+
+const createFlat = async (payload: TFlatPayload) => {
+  const normalized = normalizePayload(payload);
+
+  if (!normalized.societyId) {
+    throw new Error("Society is required");
+  }
+
+  await ensureActiveSociety(normalized.societyId);
+
+  return Flat.create(normalized);
+};
+
+const getAllFlats = async (query: Record<string, unknown>) => {
+  const filter: Record<string, unknown> = { isDeleted: false };
+
+  if (typeof query.societyId === "string" && query.societyId) {
+    if (!Types.ObjectId.isValid(query.societyId)) {
+      throw new Error("Invalid Society ID");
+    }
+    filter.societyId = query.societyId;
+  }
+
+  if (
+    typeof query.status === "string" &&
+    ["Available", "Occupied", "Maintenance"].includes(query.status)
+  ) {
+    filter.status = query.status;
+  }
+
+  if (typeof query.block === "string" && query.block.trim()) {
+    filter.block = { $regex: query.block.trim(), $options: "i" };
+  }
+
+  if (typeof query.search === "string" && query.search.trim()) {
+    const search = query.search.trim();
+    filter.$or = [
+      { flatNumber: { $regex: search, $options: "i" } },
+      { block: { $regex: search, $options: "i" } },
+      { flatType: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  return Flat.find(filter)
+    .populate("societyId", "name city")
+    .sort({ createdAt: -1 });
+};
+
+const getSingleFlat = async (id: string) => {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new Error("Invalid Flat ID");
+  }
+
+  const flat = await Flat.findOne({ _id: id, isDeleted: false }).populate(
+    "societyId",
+    "name city address"
+  );
+
+  if (!flat) {
+    throw new Error("Flat not found");
+  }
+
+  return flat;
+};
+
+const updateFlat = async (id: string, payload: TFlatPayload) => {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new Error("Invalid Flat ID");
+  }
+
+  const flat = await Flat.findOne({ _id: id, isDeleted: false });
+
+  if (!flat) {
+    throw new Error("Flat not found");
+  }
+
+  const normalized = normalizePayload(payload);
+
+  if (normalized.societyId) {
+    await ensureActiveSociety(normalized.societyId);
+  }
+
+  return Flat.findByIdAndUpdate(id, normalized, {
+    new: true,
+    runValidators: true,
+  }).populate("societyId", "name city");
+};
+
+const deleteFlat = async (id: string) => {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new Error("Invalid Flat ID");
+  }
+
+  const flat = await Flat.findOneAndUpdate(
+    { _id: id, isDeleted: false },
+    { $set: { isDeleted: true } },
+    { new: true }
+  );
+
+  if (!flat) {
+    throw new Error("Flat not found");
+  }
+
+  return flat;
+};
+
+export const FlatServices = {
+  createFlat,
+  getAllFlats,
+  getSingleFlat,
+  updateFlat,
+  deleteFlat,
+};
+
+import { z } from "zod";
+
+const flatStatusSchema = z.enum([
+  "Available",
+  "Occupied",
+  "Maintenance",
+]);
+
+export const createFlatValidationSchema = z.object({
+  body: z.object({
+    societyId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Society ID"),
+    flatNumber: z.string().trim().min(1, "Flat number is required").max(30),
+    block: z.string().trim().max(50).optional().default(""),
+    floorNumber: z.coerce.number().int().min(0).optional(),
+    flatType: z.string().trim().min(1, "Flat type is required").max(50),
+    area: z.coerce.number().min(0).optional(),
+    status: flatStatusSchema.optional().default("Available"),
+    description: z.string().trim().max(1000).optional().default(""),
+  }),
+});
+
+export const updateFlatValidationSchema = z.object({
+  body: z.object({
+    societyId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Society ID")
+      .optional(),
+    flatNumber: z.string().trim().min(1).max(30).optional(),
+    block: z.string().trim().max(50).optional(),
+    floorNumber: z.coerce.number().int().min(0).optional(),
+    flatType: z.string().trim().min(1).max(50).optional(),
+    area: z.coerce.number().min(0).optional(),
+    status: flatStatusSchema.optional(),
+    description: z.string().trim().max(1000).optional(),
+  }),
+});
+
+
+same yesa hi ek or new module create krna hai "Plan or chareges" ka society wise

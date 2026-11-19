@@ -7,76 +7,86 @@ import {
   createApi,
   fetchBaseQuery,
 } from "@reduxjs/toolkit/query/react";
-import { logout, setUser } from "../features/auth/authSlice";
+import { logout } from "../features/auth/authSlice";
 import { toast } from "sonner";
 import { RootState } from "../store";
+import {
+  beginApiRequest,
+  requiresApiConfirmation,
+  requestApiConfirmation,
+} from "./requestUi";
+
+export const API_BASE_URL = "/api/v1";
 
 const baseQuery = fetchBaseQuery({
-  // baseUrl: "http://localhost:5000/api/v1",
-  baseUrl: "https://car-wash-booking-system-server.vercel.app/api/v1",
-  credentials: "include",
+  baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.token;
 
     if (token) {
-      headers.set("authorization", `${token}`);
+      headers.set("authorization", `Bearer ${token}`);
     }
 
     return headers;
   },
 });
 
-const baseQueryWithRefreshToken: BaseQueryFn<
+const baseQueryWithSessionExpiry: BaseQueryFn<
   FetchArgs,
   BaseQueryApi,
   DefinitionType
 > = async (args, api, extraOptions): Promise<any> => {
-  let result = await baseQuery(args, api, extraOptions);
-
-  if (result?.error?.status === 404) {
-    const errorMessage = (result.error.data as { message: string }).message;
-    toast.error(errorMessage);
-  }
-  if (result?.error?.status === 403) {
-    const errorMessage = (result.error.data as { message: string }).message;
-    toast.error(errorMessage);
-  }
-  if (result?.error?.status === 401) {
-    //* Send Refresh
-    console.log("Sending refresh token");
-
-    const res = await fetch(
-      "https://car-wash-booking-system-server.vercel.app/api/v1/auth/refresh-token",
-      {
-        method: "POST",
-        credentials: "include",
-      }
-    );
-
-    const data = await res.json();
-
-    if (data?.data?.accessToken) {
-      const user = (api.getState() as RootState).auth.user;
-
-      api.dispatch(
-        setUser({
-          user,
-          token: data.data.accessToken,
-        })
-      );
-
-      result = await baseQuery(args, api, extraOptions);
-    } else {
-      api.dispatch(logout());
+  if (api.type === "mutation" && requiresApiConfirmation(api.endpoint)) {
+    const confirmed = await requestApiConfirmation(api.endpoint);
+    if (!confirmed) {
+      return {
+        error: {
+          status: "CUSTOM_ERROR",
+          error: "ACTION_CANCELLED",
+          data: {code: "ACTION_CANCELLED", message: "Action cancelled."},
+        },
+      };
     }
   }
 
-  return result;
+  const finishRequest = beginApiRequest();
+  let result;
+  try {
+    result = await baseQuery(args, api, extraOptions);
+
+    if (result?.error?.status === 404) {
+      const errorMessage = (result.error.data as { message: string }).message;
+      toast.error(errorMessage);
+    }
+    if (result?.error?.status === 403) {
+      const errorMessage = (result.error.data as { message: string }).message;
+      toast.error(errorMessage);
+    }
+    if (result?.error?.status === 401) {
+      api.dispatch(logout());
+    }
+    return result;
+  } finally {
+    finishRequest();
+  }
 };
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
-  baseQuery: baseQueryWithRefreshToken,
-  tagTypes: ["booking", "service", "services", "user", "Slot"],
+  baseQuery: baseQueryWithSessionExpiry,
+  tagTypes: ["booking", "service", "services", "user", "Slot", "car",
+    "society",
+    "flat",
+    "membership",
+    "WashService",
+    "Booking",
+    "BookingNew",
+    "Worker",
+    'Customer',
+    "plan",
+    "Offer",
+    "Attendance",
+    "PaymentTransactions",
+  ],
   endpoints: () => ({}),
 });

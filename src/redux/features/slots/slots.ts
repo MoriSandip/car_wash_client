@@ -1,5 +1,19 @@
 import { baseApi } from "../../api/baseApi";
 
+export type TAvailableSlot = {
+  _id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isBooked: "booked" | "available" | "canceled";
+  washServiceId?: string;
+};
+
+type TSlotsResponse = {
+  success: boolean;
+  data: TAvailableSlot[];
+};
+
 const SlotsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getSlots: builder.query({
@@ -8,6 +22,35 @@ const SlotsApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: ["Slot"],
+    }),
+    getWashServiceSlots: builder.query<
+      TSlotsResponse,
+      { serviceId: string; date?: string; from?: string; to?: string }
+    >({
+      query: ({ serviceId, date, from, to }) => ({
+        url: "/slots/availability",
+        method: "GET",
+        params: { serviceId, date, from, to },
+      }),
+      providesTags: ["Slot"],
+    }),
+    createWashServiceSlots: builder.mutation<
+      { success: boolean; data: TAvailableSlot[] },
+      {
+        washServiceId: string;
+        date?: string;
+        startDate?: string;
+        endDate?: string;
+        startTime: string;
+        endTime: string;
+      }
+    >({
+      query: (body) => ({
+        url: "/slots/wash-services",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Slot"],
     }),
     createSlots: builder.mutation({
       query: (userInfo) => ({
@@ -37,6 +80,8 @@ const SlotsApi = baseApi.injectEndpoints({
 
 export const {
   useGetSlotsQuery,
+  useGetWashServiceSlotsQuery,
+  useCreateWashServiceSlotsMutation,
   useCreateSlotsMutation,
   useBookingSlotsMutation,
   useUpdateSlotsMutation,

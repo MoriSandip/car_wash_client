@@ -24,7 +24,9 @@ const Navbar = () => {
     dispatch(logout());
   };
 
-  const { data } = useGetMyBookingQuery(undefined);
+  const { data } = useGetMyBookingQuery(undefined, {
+    skip: user?.role !== "user",
+  });
   const bookings = data?.data;
 
   return (

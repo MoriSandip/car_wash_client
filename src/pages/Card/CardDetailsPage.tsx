@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { selectCurrentUser } from "@/redux/features/auth/authSlice";
 import { useAmrpayPaymentMutation } from "@/redux/features/payment/paymentApi";
-import { useAppSelector } from "@/redux/hooks";
 import { TBooking } from "@/types/ServiceType";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -10,7 +8,6 @@ import { toast } from "sonner";
 const CardDetailsPage = ({ bookings }: { bookings: TBooking[] }) => {
   const [amrpayPayment, { isLoading }] = useAmrpayPaymentMutation();
   const [min, setMin] = useState(false);
-  const user = useAppSelector(selectCurrentUser);
 
   // Calculate total price
   const totalPrice = bookings?.reduce((total, booking) => {
@@ -40,13 +37,9 @@ const CardDetailsPage = ({ bookings }: { bookings: TBooking[] }) => {
       return;
     }
 
-    const data = {
-      totalPrice,
-      totalHoursInDecimal,
-      user,
-    };
-
-    const result = await amrpayPayment(data).unwrap();
+    const result = await amrpayPayment({
+      bookingIds: bookings.map((booking) => booking._id),
+    }).unwrap();
 
     if (result.success) {
       window.location.href = result?.data?.payment_url;

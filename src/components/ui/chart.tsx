@@ -67,7 +67,9 @@ ChartContainer.displayName = "Chart"
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([_, config]) => config.theme || config.color
+    ([key, config]) =>
+      /^[a-zA-Z0-9_-]+$/.test(key) &&
+      (config.theme || config.color)
   )
 
   if (!colorConfig.length) {
@@ -86,7 +88,12 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+            const safeColor =
+              typeof color === "string" &&
+              (/^#[\da-f]{3,8}$/i.test(color) ||
+                /^(?:rgb|hsl)a?\([\d\s.,%+-]+\)$/i.test(color) ||
+                /^[a-z]+$/i.test(color))
+            return safeColor ? `  --color-${key}: ${color};` : null
   })
   .join("\n")}
 }

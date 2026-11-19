@@ -43,7 +43,7 @@ const Register = () => {
 
     try {
       const image = await imageUpload(photoFile);
-      const imageUrl = image?.data?.url;
+      const imageUrl = image.data.url;
       const createUserData = {
         name: data.full_name,
         phone: data.phoneNo,
@@ -54,7 +54,6 @@ const Register = () => {
       const userCreate = await createUser(createUserData);
       if (userCreate?.error) {
         setRegisterError((userCreate?.error as any)?.data?.message);
-        console.log(userCreate?.error);
       }
       if (userCreate?.data?.success) {
         const email = data?.email;
@@ -68,9 +67,8 @@ const Register = () => {
         const redirectTo = location.state?.from || "/";
         navigate(redirectTo, { replace: true });
       }
-    } catch (error) {
-      //  setRegisterError((error as any).message);
-      console.log(error);
+    } catch {
+      setRegisterError("Registration failed. Please try again.");
     }
   };
 

@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /dashboard
+Disallow: /worker
+Disallow: /bookings
+Disallow: /profile
+Disallow: /customer
+Disallow: /forgot-password
+
+Sitemap: https://car-wash-booking-system-client.vercel.app/sitemap.xml

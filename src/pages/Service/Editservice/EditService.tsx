@@ -9,11 +9,11 @@ import { Card } from "@/components/ui/card";
 interface ServiceFormProps {
   onSubmit: (data: any) => void;
   defaultValues?: {
-    image?: string[] | undefined;
-    title?: string | undefined;
-    description?: string | undefined;
-    price?: string | 0;
-    duration?: string | 0;
+    image?: string[];
+    title?: string;
+    description?: string;
+    price?: string | number;
+    duration?: string | number;
   };
   UpdateLoading?: boolean;
 }
@@ -24,35 +24,45 @@ const EditService: React.FC<ServiceFormProps> = ({
   UpdateLoading,
 }) => {
   const [message, setMessage] = useState(defaultValues?.description || "");
+
   const [imageInput, setImageInput] = useState<string>(
-    defaultValues?.image?.join("  , ") || "    "
+    defaultValues?.image?.join(", ") || ""
   );
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+
+  const handleTextareaChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
     setMessage(e.target.value);
   };
 
-  const handleFormSubmit = (data: any) => {
-    const formDataImg = {
-      ...defaultValues,
-      image: imageInput.split(",").map((url) => url.trim()), // Split and trim the input
-    };
-    onSubmit({ ...data, message, formDataImg });
-  };
-
-  // Handle the change in the image input
   const handleImageInputChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>
   ) => {
     setImageInput(e.target.value);
   };
+
+  const handleFormSubmit = (data: any) => {
+    const payload = {
+      title: String(data.title || "").trim(),
+      description: message.trim(),
+      price: String(data.price ?? ""),
+      duration: Number(data.duration),
+      image: imageInput
+        .split(",")
+        .map((url) => url.trim())
+        .filter(Boolean),
+    };
+
+    onSubmit(payload);
+  };
+
   return (
     <Card className="w-[80%] mx-auto mt-4 p-6">
       <CarForm
         onSubmit={handleFormSubmit}
         defaultValues={defaultValues}
-        className="space-y-4 "
+        className="space-y-4"
       >
-        {/* title Field */}
         <div>
           <CarInput
             type="text"
@@ -62,7 +72,6 @@ const EditService: React.FC<ServiceFormProps> = ({
           />
         </div>
 
-        {/* price Field */}
         <div>
           <CarInput
             type="number"
@@ -72,7 +81,6 @@ const EditService: React.FC<ServiceFormProps> = ({
           />
         </div>
 
-        {/* duration Field */}
         <div>
           <CarInput
             type="number"
@@ -82,9 +90,8 @@ const EditService: React.FC<ServiceFormProps> = ({
           />
         </div>
 
-        {/* description Field */}
         <div>
-          <label htmlFor="message">Description</label>
+          <label htmlFor="description">Description</label>
           <Textarea
             id="description"
             name="description"
@@ -94,22 +101,23 @@ const EditService: React.FC<ServiceFormProps> = ({
           />
         </div>
 
-        {/* image Field */}
         <div>
-          <label htmlFor="message">
-            Image URLs (comma-separated)Like <span> , </span>{" "}
-          </label>
+          <label htmlFor="image">Image URLs (comma-separated)</label>
           <Textarea
+            id="image"
             name="image"
-            placeholder="Image URLs"
+            placeholder="Enter image URLs separated by commas"
             value={imageInput}
             onChange={handleImageInputChange}
           />
         </div>
 
-        {/* Submit Button */}
-        <Button type="submit" className="w-full">
-          {UpdateLoading ? "Loading..." : " Submit"}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={UpdateLoading}
+        >
+          {UpdateLoading ? "Loading..." : "Submit"}
         </Button>
       </CarForm>
     </Card>

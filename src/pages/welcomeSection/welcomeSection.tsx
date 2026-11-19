@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const WelcomeSection = () => {
   return (
     <div className="flex justify-center items-center text-white">
@@ -18,12 +20,12 @@ const WelcomeSection = () => {
             </p>
 
             <div className="mt-4 md:mt-8">
-              <a
-                href="#"
+              <Link
+                to="/customer/register"
                 className="inline-block rounded bg-rose-600 px-12 py-3 text-sm font-medium text-white transition hover:bg-rose-400 focus:outline-none focus:ring focus:ring-yellow-400"
               >
                 Get Started Today
-              </a>
+              </Link>
             </div>
           </div>
         </div>

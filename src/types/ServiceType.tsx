@@ -69,7 +69,7 @@ export type User = {
   imageUrl: string; // Assuming role can be either "user" or "admin"
   address: string;
   isDeleted: boolean;
-  userStatus: "in-progress" | "block" | "inactive"; // Assuming userStatus could have additional statuses
+  userStatus: "in-progress" | "blocked" | "block" | "inactive";
   createdAt: string; // Date as ISO string
   updatedAt: string; // Date as ISO string
 };

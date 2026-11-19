@@ -7,13 +7,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { selectCurrentUser } from "@/redux/features/auth/authSlice";
 import { useDeleteSingleMyBookingMutation } from "@/redux/features/booking/booking";
 import {
   useAmrpayPaymentMutation,
   // usePaymentMutation,
 } from "@/redux/features/payment/paymentApi";
-import { useAppSelector } from "@/redux/hooks";
 import { TBooking } from "@/types/ServiceType";
 // import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -28,7 +26,6 @@ export function CartSheet({
   // const [payment, { isLoading }] = usePaymentMutation();
   const [deleteSingleMyBooking] = useDeleteSingleMyBookingMutation();
   const [amrpayPayment, { isLoading }] = useAmrpayPaymentMutation();
-  const user = useAppSelector(selectCurrentUser);
   // delete function
 
   const handleDelete = async (id: string) => {
@@ -40,27 +37,13 @@ export function CartSheet({
     }
   };
 
-  const totalPrice = bookings?.reduce((total, booking) => {
-    const price = parseFloat(booking.serviceId.price);
-    return total + price;
-  }, 0);
-
-  const totalMin = bookings?.reduce((total, booking) => {
-    const durationInMinutes = parseFloat(booking.serviceId.duration);
-    return total + durationInMinutes;
-  }, 0);
-
-  const totalHoursInDecimal = totalMin / 60;
-
   const handelPayment = async () => {
     if (bookings.length === 0) {
       toast.error("No Booking quantity ");
       return;
     }
     const result = await amrpayPayment({
-      totalPrice,
-      user,
-      totalHoursInDecimal,
+      bookingIds: bookings.map((booking) => booking._id),
     }).unwrap();
 
     if (result.success) {

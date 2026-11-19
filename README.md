@@ -29,6 +29,14 @@ npm run build
 
 yarn build
 
+### API configuration
+
+Web API requests use the same-origin path `/api/v1`. In local development,
+Vite proxies `/api` to `http://localhost:3000`; start the API on port 3000.
+The Vercel deployment proxies `/api/*` to the server project. This avoids
+cross-origin browser requests for login and other API calls. Other hosting
+providers must configure an equivalent same-origin `/api/*` reverse proxy.
+
 ## 📜 Features
 
 ### Public Pages
